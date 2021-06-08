@@ -32,15 +32,17 @@ if (!$bind2) {
 }
 
 
-function listGroupAndMembers($ldap,$binddn){
+function list_groups($ldap,$binddn,$domainname){
     //distribution group
     $filter = "(&(objectCategory=group)(!(groupType:1.2.840.113556.1.4.803:=2147483648)))";
     $result = ldap_search($ldap, $binddn, $filter);
     $entries = ldap_get_entries($ldap,$result);
+    //print_r($entries);
     
     $numberOfGroups = $entries["count"];
     $data = [];
     $data["count"] = $numberOfGroups;
+    $data["domainName"] = $domainname;
     for($i=0 ; $i<$numberOfGroups ; $i++){
     
         $name = $entries[$i]["cn"][0];
@@ -60,65 +62,89 @@ function listGroupAndMembers($ldap,$binddn){
             $member = substr($member, 0, $comma_position);
             array_push($data[$name], $member);
         }
-
-        
-        
-        
+    
     }
     return $data;
 }
-$data1 = listGroupAndMembers($ldap1,$binddn1);
-$data2 = listGroupAndMembers($ldap2,$binddn2);
-print_r($domainname1."\n");
+
+function sync($ldap1,$ldap2,$data1,$data2){
+    $domainName1 = $data1["domainName"];
+    $domainName2 = $data2["domainName"];
+
+    for($i=0 ; $i<$data1["count"]; $i++){
+        $groupName = $data1[$i];
+    
+        if (in_array($groupName, $data2)) {
+
+            print_r("\nikisinde de ".$groupName." var");
+            $numberOfMembers = count($data1[$groupName]);
+
+            for($j=0 ; $j<$numberOfMembers; $j++){
+
+                $memberName = $data1[$groupName][$j];
+
+                if (in_array($memberName, $data2[$groupName])){
+                    print_r("\n\t ".$memberName." ortak");
+                }
+                else{
+                    print_r("\n\t ".$domainName2."'a ".$memberName." eklenmeli");
+                }
+
+            }
+        }
+        else{
+            print_r("\n".$domainName2."'a ".$groupName." eklenmeli");
+    
+        }
+    }
+    print_r("\n");
+    
+    for($i=0 ; $i<$data2["count"]; $i++){
+        $groupName = $data2[$i];
+    
+        if (in_array($groupName, $data1)) {
+
+            print_r("\nikisinde de ".$groupName." var");
+            $numberOfMembers = count($data2[$groupName]);
+
+            for($j=0 ; $j<$numberOfMembers; $j++){
+                $memberName = $data2[$groupName][$j];
+                if (in_array($memberName, $data1[$groupName])){
+                    print_r("\n\t ".$memberName." ortak");
+                }
+                else{
+                    print_r("\n\t ".$domainName2."'dan ".$memberName." silinmeli");
+                    delete_user($ldap2,$groupName,$memberName);
+                    
+                }
+            }
+        }
+        else{
+            print_r("\n".$domainName2."'dan ".$groupName." silinmeli");
+        }
+    }
+}
+
+function delete_user($ldap,$groupName,$memberName){
+
+    $group = 'CN='.$groupName.',CN=Users,DC=bugra,DC=lab';
+    $group_info['member'] = $memberName.',CN=Users,DC=bugra,DC=lab';
+    ldap_mod_del($ldap, $group, $group_info);
+    
+}
+
+
+$data1 = list_groups($ldap1,$binddn1,$domainname1);
+$data2 = list_groups($ldap2,$binddn2,$domainname2);
 print_r($data1);
-print_r("\n\n$domainname2\n");
 print_r($data2);
+sync($ldap1,$ldap2,$data1,$data2);
 
-
-for($i=0 ; $i<$data1["count"]; $i++){
-    $name = $data1[$i];
-
-    if (in_array($name, $data2)) {
-        print_r("\nikisinde de ".$name." var");
-        $numberOfMembers = count($data1[$name]);
-        for($j=0 ; $j<$numberOfMembers; $j++){
-            $memberName = $data1[$name][$j];
-            if (in_array($memberName, $data2[$name])){
-                print_r("\n\t ".$memberName." ortak");
-            }
-            else{
-                print_r("\n\t ".$memberName." eklenmeli");
-            }
-        }
-    }
-    else{
-        print_r("\n".$domainname2."'a ".$name." eklenmeli");
-
-    }
-}
-print_r("\n");
-
-for($i=0 ; $i<$data2["count"]; $i++){
-    $name = $data2[$i];
-
-    if (in_array($name, $data1)) {
-        print_r("\nikisinde de ".$name." var");
-        $numberOfMembers = count($data2[$name]);
-        for($j=0 ; $j<$numberOfMembers; $j++){
-            $memberName = $data2[$name][$j];
-            if (in_array($memberName, $data1[$name])){
-                print_r("\n\t ".$memberName." ortak");
-            }
-            else{
-                print_r("\n\t ".$memberName." silinmeli");
-            }
-        }
-    }
-    else{
-        print_r("\n".$domainname2."'dan ".$name." silinmeli");
-
-    }
-}
+$data1 = list_groups($ldap1,$binddn1,$domainname1);
+$data2 = list_groups($ldap2,$binddn2,$domainname2);
+print_r($data1);
+print_r($data2);
+sync($ldap1,$ldap2,$data1,$data2);
 
 
 print_r("\n");
