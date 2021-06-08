@@ -88,6 +88,7 @@ function sync($ldap1,$ldap2,$data1,$data2){
                 }
                 else{
                     print_r("\n\t ".$domainName2."'a ".$memberName." eklenmeli");
+                    add_member($ldap2,$groupName,$memberName);
                 }
 
             }
@@ -114,7 +115,7 @@ function sync($ldap1,$ldap2,$data1,$data2){
                 }
                 else{
                     print_r("\n\t ".$domainName2."'dan ".$memberName." silinmeli");
-                    delete_user($ldap2,$groupName,$memberName);
+                    delete_member($ldap2,$groupName,$memberName);
                     
                 }
             }
@@ -126,7 +127,34 @@ function sync($ldap1,$ldap2,$data1,$data2){
     }
 }
 
-function delete_user($ldap,$groupName,$memberName){
+function add_group($ldap,$groupName){
+
+    $group_info["objectClass"] = "top";
+    $group_info["objectClass"] = "group";
+    $group_info["groupType"] = 2;
+    $group_info["instanceType"] = 4;
+    $group_info["name"] = $groupName;
+
+    $dn = 'CN='.$groupName.',CN=Users,DC=bugra,DC=lab';
+    ldap_add($ldap, $dn,$group_info);
+
+}
+
+function add_member($ldap,$groupName,$memberName){
+
+    $dn = 'CN='.$groupName.',CN=Users,DC=bugra,DC=lab';
+    $group_info['member'] = $memberName.',CN=Users,DC=bugra,DC=lab';
+    ldap_mod_add($ldap,$dn,$group_info);
+
+}
+function delete_group($ldap,$groupName){
+
+    $group = 'CN='.$groupName.',CN=Users,DC=bugra,DC=lab';
+    ldap_delete($ldap, $group);
+
+}
+
+function delete_member($ldap,$groupName,$memberName){
 
     $group = 'CN='.$groupName.',CN=Users,DC=bugra,DC=lab';
     $group_info['member'] = $memberName.',CN=Users,DC=bugra,DC=lab';
@@ -134,24 +162,9 @@ function delete_user($ldap,$groupName,$memberName){
 
 }
 
-function delete_group($ldap,$groupName){
 
-    $group = 'CN='.$groupName.',CN=Users,DC=bugra,DC=lab';
-    ldap_delete($ldap, $group);
 
-}
-function add_group($ldap,$groupName){
 
-    $info["objectClass"] = "top";
-    $info["objectClass"] = "group";
-    $info["groupType"] = 2;
-    $info["instanceType"] = 4;
-    $info["name"] = $groupName;
-
-    $dn = 'CN='.$groupName.',CN=Users,DC=bugra,DC=lab';
-    ldap_add($ldap, $dn,$info);
-
-}
 
 
 
