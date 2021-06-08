@@ -94,7 +94,7 @@ function sync($ldap1,$ldap2,$data1,$data2){
         }
         else{
             print_r("\n".$domainName2."'a ".$groupName." eklenmeli");
-    
+            add_group($ldap2,$groupName);
         }
     }
     print_r("\n");
@@ -140,6 +140,19 @@ function delete_group($ldap,$groupName){
     ldap_delete($ldap, $group);
 
 }
+function add_group($ldap,$groupName){
+
+    $info["objectClass"] = "top";
+    $info["objectClass"] = "group";
+    $info["groupType"] = 2;
+    $info["instanceType"] = 4;
+    $info["name"] = $groupName;
+
+    $dn = 'CN='.$groupName.',CN=Users,DC=bugra,DC=lab';
+    ldap_add($ldap, $dn,$info);
+
+}
+
 
 
 $data1 = list_groups($ldap1,$binddn1,$domainname1);
