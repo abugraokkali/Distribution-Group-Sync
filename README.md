@@ -1,1 +1,3 @@
-# distribution-group-sync
+# Distribution Group Synchronization
+
+Ali Buğra Okkalı
