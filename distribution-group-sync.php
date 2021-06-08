@@ -121,6 +121,7 @@ function sync($ldap1,$ldap2,$data1,$data2){
         }
         else{
             print_r("\n".$domainName2."'dan ".$groupName." silinmeli");
+            delete_group($ldap2,$groupName);
         }
     }
 }
@@ -130,7 +131,14 @@ function delete_user($ldap,$groupName,$memberName){
     $group = 'CN='.$groupName.',CN=Users,DC=bugra,DC=lab';
     $group_info['member'] = $memberName.',CN=Users,DC=bugra,DC=lab';
     ldap_mod_del($ldap, $group, $group_info);
-    
+
+}
+
+function delete_group($ldap,$groupName){
+
+    $group = 'CN='.$groupName.',CN=Users,DC=bugra,DC=lab';
+    ldap_delete($ldap, $group);
+
 }
 
 
@@ -139,6 +147,8 @@ $data2 = list_groups($ldap2,$binddn2,$domainname2);
 print_r($data1);
 print_r($data2);
 sync($ldap1,$ldap2,$data1,$data2);
+
+print_r("\n");
 
 $data1 = list_groups($ldap1,$binddn1,$domainname1);
 $data2 = list_groups($ldap2,$binddn2,$domainname2);
