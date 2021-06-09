@@ -64,9 +64,8 @@ function find_groups($ldap,$binddn,$domainname){
     }
     return $data;
 }
-function sync(){
-    $data1 = find_groups($ldap1,$binddn1,$domainname1);
-    $data2 = find_groups($ldap2,$binddn2,$domainname2);
+function sync($data1,$data2){
+
     //find_groups'un ciktisi olan iki dist. group listesini karsilastirir
     //ve gerekli islemlerin ne olduguna karar verir.
 
@@ -76,8 +75,7 @@ function sync(){
         //2. domainde eksik grup varsa; grubu ac ve uyelerini doldur.
         if (!in_array($groupName, $data2)) {
             create_group($groupName);
-            add_members
-            ($groupName,$data1,$data2);  
+            add_members($groupName,$data1,$data2);  
         }
         //ortak grup varsa; 2. domaindeki gruba eksik uyeleri ekle.
         else{
@@ -163,8 +161,24 @@ function remove_members($groupName,$data1,$data2){
 }
 
 
+$data1 = find_groups($ldap1,$binddn1,$domainname1);
+$data2 = find_groups($ldap2,$binddn2,$domainname2);
+print_r("\n ### Before the synchronization ###");
+print_r($data1);
+print_r("\n");
+print_r($data2);
 
 sync($data1,$data2);
+print_r("\n");
+print_r("\n ### After synchronization ###");
+print_r("\n");
+
+$data1 = find_groups($ldap1,$binddn1,$domainname1);
+$data2 = find_groups($ldap2,$binddn2,$domainname2);
+print_r("\n");
+print_r($data1);
+print_r("\n");
+print_r($data2);
 
 
 print_r("\n");
