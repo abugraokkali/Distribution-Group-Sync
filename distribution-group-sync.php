@@ -31,103 +31,81 @@ if (!$bind2) {
     exit('Binding failed');
 }
 
-
-function list_groups($ldap,$binddn,$domainname){
-    //distribution group
+function find_groups($ldap,$binddn,$domainname){
+    //Distribution gruplari ve memberlarini ceker, bir array halinde doner.
     $filter = "(&(objectCategory=group)(!(groupType:1.2.840.113556.1.4.803:=2147483648)))";
     $result = ldap_search($ldap, $binddn, $filter);
     $entries = ldap_get_entries($ldap,$result);
-    //print_r($entries);
-    
-    $numberOfGroups = $entries["count"];
-    $data = [];
-    $data["count"] = $numberOfGroups;
-    $data["domainName"] = $domainname;
+
+    $data['count'] = $entries['count'];
+    $data['domainName'] = $domainname;
+
+    $numberOfGroups = $entries['count'];
     for($i=0 ; $i<$numberOfGroups ; $i++){
     
-        $name = $entries[$i]["cn"][0];
-
-        if (array_key_exists("member", $entries[$i]) )
-            $numberOfMembers = $entries[$i]["member"]["count"];
-        else{
-            $numberOfMembers = 0;
-        }
-        
-        $data[$name] = [];
+        $name = $entries[$i]['name'][0];
         $data[$i] = $name;
-        for($j=0 ; $j<$numberOfMembers ; $j++ ){
+        $data[$name] = array();
+        if (array_key_exists('member', $entries[$i]) ){
+            $numberOfMembers = $entries[$i]['member']['count'];
+        }
+        else{
+            $numberOfMembers = 0; 
+        }
     
-            $member = $entries[$i]["member"][$j];
-            $comma_position = strpos($member, ',');
-            $member = substr($member, 0, $comma_position);
+        for($j=0 ; $j<$numberOfMembers ; $j++ ){
+
+            $member = $entries[$i]['member'][$j];
+            $pos = strpos($member, ',');
+            $member = substr($member,0,$pos);
             array_push($data[$name], $member);
         }
-    
+
     }
     return $data;
 }
+function sync(){
+    $data1 = find_groups($ldap1,$binddn1,$domainname1);
+    $data2 = find_groups($ldap2,$binddn2,$domainname2);
+    //find_groups'un ciktisi olan iki dist. group listesini karsilastirir
+    //ve gerekli islemlerin ne olduguna karar verir.
 
-function sync($ldap1,$ldap2,$data1,$data2){
-    $domainName1 = $data1["domainName"];
-    $domainName2 = $data2["domainName"];
+    for($i=0 ; $i<$data1['count']; $i++){
 
-    for($i=0 ; $i<$data1["count"]; $i++){
         $groupName = $data1[$i];
-    
-        if (in_array($groupName, $data2)) {
-
-            print_r("\nikisinde de ".$groupName." var");
-            $numberOfMembers = count($data1[$groupName]);
-
-            for($j=0 ; $j<$numberOfMembers; $j++){
-
-                $memberName = $data1[$groupName][$j];
-
-                if (in_array($memberName, $data2[$groupName])){
-                    print_r("\n\t ".$memberName." ortak");
-                }
-                else{
-                    print_r("\n\t ".$domainName2."'a ".$memberName." eklenmeli");
-                    add_member($ldap2,$groupName,$memberName);
-                }
-
-            }
+        //2. domainde eksik grup varsa; grubu ac ve uyelerini doldur.
+        if (!in_array($groupName, $data2)) {
+            create_group($groupName);
+            add_members
+            ($groupName,$data1,$data2);  
         }
+        //ortak grup varsa; 2. domaindeki gruba eksik uyeleri ekle.
         else{
-            print_r("\n".$domainName2."'a ".$groupName." eklenmeli");
-            add_group($ldap2,$groupName);
+            add_members
+            ($groupName,$data1,$data2);  
         }
+
     }
     print_r("\n");
     
-    for($i=0 ; $i<$data2["count"]; $i++){
+    for($i=0 ; $i<$data2['count']; $i++){
+
         $groupName = $data2[$i];
-    
-        if (in_array($groupName, $data1)) {
-
-            print_r("\nikisinde de ".$groupName." var");
-            $numberOfMembers = count($data2[$groupName]);
-
-            for($j=0 ; $j<$numberOfMembers; $j++){
-                $memberName = $data2[$groupName][$j];
-                if (in_array($memberName, $data1[$groupName])){
-                    print_r("\n\t ".$memberName." ortak");
-                }
-                else{
-                    print_r("\n\t ".$domainName2."'dan ".$memberName." silinmeli");
-                    delete_member($ldap2,$groupName,$memberName);
-                    
-                }
-            }
+        //2. domainde fazladan grup varsa; grubu sil
+        if (!in_array($groupName, $data1)) {
+            delete_group($groupName);
         }
+        //ortak grup varsa; 2. domaindeki gruptan falza uyeleri sil.
         else{
-            print_r("\n".$domainName2."'dan ".$groupName." silinmeli");
-            delete_group($ldap2,$groupName);
+            remove_members($groupName,$data1,$data2);
         }
+        
     }
 }
 
-function add_group($ldap,$groupName){
+function create_group($groupName){
+
+    $ldap2 = $GLOBALS["ldap2"];
 
     $group_info["objectClass"] = "top";
     $group_info["objectClass"] = "group";
@@ -136,51 +114,57 @@ function add_group($ldap,$groupName){
     $group_info["name"] = $groupName;
 
     $dn = 'CN='.$groupName.',CN=Users,DC=bugra,DC=lab';
-    ldap_add($ldap, $dn,$group_info);
+    ldap_add($ldap2, $dn,$group_info);
 
 }
+function delete_group($groupName){
 
-function add_member($ldap,$groupName,$memberName){
-
-    $dn = 'CN='.$groupName.',CN=Users,DC=bugra,DC=lab';
-    $group_info['member'] = $memberName.',CN=Users,DC=bugra,DC=lab';
-    ldap_mod_add($ldap,$dn,$group_info);
-
-}
-function delete_group($ldap,$groupName){
-
+    $ldap2 = $GLOBALS["ldap2"];
     $group = 'CN='.$groupName.',CN=Users,DC=bugra,DC=lab';
-    ldap_delete($ldap, $group);
+    ldap_delete($ldap2, $group);
 
 }
+function add_members($groupName,$data1,$data2){
 
-function delete_member($ldap,$groupName,$memberName){
+    $ldap2 = $GLOBALS["ldap2"];
+    //data2'nin guncellemesi gerekiyor cunku yeni grup eklendi.
+    $data2 = find_groups($GLOBALS["ldap2"],$GLOBALS["binddn2"],$GLOBALS["domainname2"]);
+    
+    $numberOfMembers = count($data1[$groupName]);
+            
+    for($j=0 ; $j<$numberOfMembers; $j++){
 
-    $group = 'CN='.$groupName.',CN=Users,DC=bugra,DC=lab';
-    $group_info['member'] = $memberName.',CN=Users,DC=bugra,DC=lab';
-    ldap_mod_del($ldap, $group, $group_info);
+        $memberName = $data1[$groupName][$j];
 
+        if (!in_array($memberName, $data2[$groupName])){
+            $dn = 'CN='.$groupName.',CN=Users,DC=bugra,DC=lab';
+            $group_info['member'] = $memberName.',CN=Users,DC=bugra,DC=lab';
+            ldap_mod_add($ldap2,$dn,$group_info);
+        }
+    }
+}
+function remove_members($groupName,$data1,$data2){
+    
+    $ldap2 = $GLOBALS["ldap2"];
+
+    $data2 = find_groups($GLOBALS["ldap2"],$GLOBALS["binddn2"],$GLOBALS["domainname2"]);
+    
+    $numberOfMembers = count($data2[$groupName]);
+
+    for($j=0 ; $j<$numberOfMembers; $j++){
+        $memberName = $data2[$groupName][$j];
+
+        if(!in_array($memberName, $data1[$groupName])){
+            $group = 'CN='.$groupName.',CN=Users,DC=bugra,DC=lab';
+            $group_info['member'] = $memberName.',CN=Users,DC=bugra,DC=lab';
+            ldap_mod_del($ldap2, $group, $group_info);  
+        }
+    }
 }
 
 
 
-
-
-
-
-$data1 = list_groups($ldap1,$binddn1,$domainname1);
-$data2 = list_groups($ldap2,$binddn2,$domainname2);
-print_r($data1);
-print_r($data2);
-sync($ldap1,$ldap2,$data1,$data2);
-
-print_r("\n");
-
-$data1 = list_groups($ldap1,$binddn1,$domainname1);
-$data2 = list_groups($ldap2,$binddn2,$domainname2);
-print_r($data1);
-print_r($data2);
-sync($ldap1,$ldap2,$data1,$data2);
+sync($data1,$data2);
 
 
 print_r("\n");
