@@ -79,8 +79,7 @@ function sync($data1,$data2){
         }
         //ortak grup varsa; 2. domaindeki gruba eksik uyeleri ekle.
         else{
-            add_members
-            ($groupName,$data1,$data2);  
+            add_members($groupName,$data1,$data2);  
         }
 
     }
