@@ -1,4 +1,10 @@
 <?php
+/**
+ * Constants
+ */
+define("DefaultGroupDN", "CN=Gruplar,CN=Users,DC=bugra,DC=lab");
+$logfile = fopen("logfile.txt", "w");
+
 /** 
  * Connection 1
 */
@@ -38,17 +44,17 @@ if (!$bind2) {
 }
 
 /**
- * Constants and Globals
+ *Globals
  */
-define("DefaultGroupDN", "CN=Gruplar,CN=Users,DC=bugra,DC=lab");
-$dn_list1 = find_dn($ldap1,$binddn1);
-$dn_list2 = find_dn($ldap2,$binddn2);
+$dn_list1 = find_dn_list($ldap1,$binddn1);
+$dn_list2 = find_dn_list($ldap2,$binddn2);
 
 /**
  * Distribution gruplari ve memberlarini ceker, bir array halinde doner.
  */
-function find_groups($ldap,$binddn,$domainname){
+function find_groups($ldap,$binddn,$domainname,$number){
 
+    //distribution gruplarin bulunmasi
     $filter = "(&(objectCategory=group)(!(groupType:1.2.840.113556.1.4.803:=2147483648)))";
     $result = ldap_search($ldap, $binddn, $filter);
     $entries = ldap_get_entries($ldap,$result);
@@ -58,10 +64,11 @@ function find_groups($ldap,$binddn,$domainname){
 
     $numberOfGroups = $entries['count'];
     for($i=0 ; $i<$numberOfGroups ; $i++){
-    
+        
         $name = $entries[$i]['name'][0];
         $data[$i] = $name;
         $data[$name] = array();
+        //eger uyesi varsa
         if (array_key_exists('member', $entries[$i]) ){
             $numberOfMembers = $entries[$i]['member']['count'];
         }
@@ -72,11 +79,23 @@ function find_groups($ldap,$binddn,$domainname){
         for($j=0 ; $j<$numberOfMembers ; $j++ ){
 
             $member = $entries[$i]['member'][$j];
-            $pos1 = stripos($member, ',');
+            if($number == 1){
+                $dn_list1 = $GLOBALS["dn_list1"];
+                $samaccountname = array_search($member,$dn_list1);
+                array_push($data[$name], $samaccountname);
+            }
+            if($number == 2){
+                $dn_list2 = $GLOBALS["dn_list2"];
+                $samaccountname = array_search($member,$dn_list2);
+                array_push($data[$name], $samaccountname);
+            }
+            
+            /*$pos1 = stripos($member, ',');
             $member = substr($member,0,$pos1);
             $pos2 = stripos($member, '=');
             $member = substr($member,$pos2+1);
-            array_push($data[$name], $member);
+            array_push($data[$name], $member);*/
+            
         }
 
     }
@@ -87,7 +106,7 @@ function find_groups($ldap,$binddn,$domainname){
  * Parametre olarak verilen domaindeki tum userlarin ve dist. gruplarin 
  * DN'lerini ceker, username => DN seklinde ikililerden olusan bir array doner.
  */
-function find_dn($ldap,$binddn){
+function find_dn_list($ldap,$binddn){
     
     $filter = "objectCategory=user";
     $result = ldap_search($ldap, $binddn, $filter);
@@ -117,14 +136,14 @@ function find_dn($ldap,$binddn){
  * Global variable'lar aracigiliyla DN listesini gunceller. Bu isleme yeni bir grup
  * eklendiginde veya silindiginde ihtiyac duyulur.
  */
-function update_dn(){
+function update_dn_list($name,$dn){
 
-    $ldap1 = $GLOBALS["ldap1"];
     $ldap2 = $GLOBALS["ldap2"];
-    $binddn1 = $GLOBALS["binddn1"];
     $binddn2 = $GLOBALS["binddn2"];
-    $GLOBALS["dn_list1"] = find_dn($ldap1,$binddn1);
-    $GLOBALS["dn_list2"] = find_dn($ldap2,$binddn2);
+    $GLOBALS["dn_list2"] = find_dn_list($ldap2,$binddn2);
+    //$dn_list2 = $GLOBALS["dn_list2"];
+    //array_push($dn_list2,$name,$dn);
+    //print_r($dn_list2);
 }
 
 /**
@@ -167,7 +186,7 @@ function sync($data1,$data2){
  * 2. domainde eksik olan grubu ekler ve DN listesini gunceller.
  */
 function create_group($groupName){
-
+    $logfile = $GLOBALS["logfile"];
     $ldap2 = $GLOBALS["ldap2"];
 
     $group_info["objectClass"] = "top";
@@ -178,7 +197,9 @@ function create_group($groupName){
 
     $dn = 'CN='.$groupName.','.DefaultGroupDN;
     ldap_add($ldap2, $dn,$group_info);
-    update_dn();
+    update_dn_list($groupName,$dn);
+    fwrite($logfile, $groupName." isimli grup eklendi.\n");
+    //TODO :  Update DN
 }
 
 /**
@@ -186,11 +207,13 @@ function create_group($groupName){
  */
 function delete_group($groupName){
 
+    $logfile = $GLOBALS["logfile"];
     $dn_list2 = $GLOBALS["dn_list2"];
     $ldap2 = $GLOBALS["ldap2"];
     $dn = $dn_list2[$groupName];
     ldap_delete($ldap2, $dn);
-    update_dn();
+    fwrite($logfile, $groupName." isimli grup silindi.\n");
+
 }
 
 /**
@@ -198,12 +221,13 @@ function delete_group($groupName){
  * (eger o isme sahip bir user o domainde yoksa eklemez.)
  */
 function add_members($groupName,$data1,$data2){
-
+    
+    $logfile = $GLOBALS["logfile"];
     $ldap2 = $GLOBALS["ldap2"];
     $dn_list2 = $GLOBALS["dn_list2"];
 
     //data2'nin guncellemesi gerekiyor cunku yeni grup eklendi.
-    $data2 = find_groups($GLOBALS["ldap2"],$GLOBALS["binddn2"],$GLOBALS["domainname2"]);
+    $data2 = find_groups($GLOBALS["ldap2"],$GLOBALS["binddn2"],$GLOBALS["domainname2"],2);
     
     $numberOfMembers = count($data1[$groupName]);
             
@@ -215,16 +239,20 @@ function add_members($groupName,$data1,$data2){
 
             //2. domainde eklenmeye calisilan user 2. domainde tanimli bir usersa
             if(array_key_exists($memberName, $dn_list2) ){
+                //print_r($groupName."\n\n");
                 $dn = $dn_list2[$groupName];
                 $group_info['member'] = $dn_list2[$memberName];
                 ldap_mod_add($ldap2,$dn,$group_info);
+                update_dn_list($memberName,$dn);
+                fwrite($logfile, $groupName." grubundan ".$memberName." kullanicisi silindi.\n");
+
             }
             else{
                 //TODO User Create Edilmeli
             }
         }
     }
-    update_dn();
+    
 
 }
 
@@ -233,6 +261,7 @@ function add_members($groupName,$data1,$data2){
  */
 function remove_members($groupName,$data1,$data2){
     
+    $logfile = $GLOBALS["logfile"];
     $ldap2 = $GLOBALS["ldap2"];
     $dn_list2 = $GLOBALS["dn_list2"];
 
@@ -247,9 +276,10 @@ function remove_members($groupName,$data1,$data2){
             $dn = $dn_list2[$groupName];
             $group_info['member'] = $dn_list2[$memberName];
             ldap_mod_del($ldap2, $dn, $group_info);  
+            fwrite($logfile, $groupName." grubundan ".$memberName." kullanicisi silindi.\n");
+
         }
     }
-    update_dn();
 
 }
 
@@ -265,8 +295,8 @@ function run(){
     $domainname1 = $GLOBALS["domainname1"];
     $domainname2 = $GLOBALS["domainname2"];
 
-    $data1 = find_groups($ldap1,$binddn1,$domainname1);
-    $data2 = find_groups($ldap2,$binddn2,$domainname2);
+    $data1 = find_groups($ldap1,$binddn1,$domainname1,1);
+    $data2 = find_groups($ldap2,$binddn2,$domainname2,2);
 
     print_r("\n ### Before the synchronization ###");
     print_r("\n");
@@ -280,17 +310,22 @@ function run(){
     print_r("\n ### After synchronization ###");
     print_r("\n");
     
-    $data1 = find_groups($ldap1,$binddn1,$domainname1);
-    $data2 = find_groups($ldap2,$binddn2,$domainname2);
+    $data1 = find_groups($ldap1,$binddn1,$domainname1,1);
+    $data2 = find_groups($ldap2,$binddn2,$domainname2,2);
 
     print_r("\n");
     print_r($data1);
     print_r("\n");
     print_r($data2);
     print_r("\n");
+
+    
 }
-
-
+/*
+print_r($dn_list1);
+print_r("\n");
+print_r($dn_list2);
+print_r("\n");*/
 run();
 ldap_close($ldap1);
 ldap_close($ldap2);
