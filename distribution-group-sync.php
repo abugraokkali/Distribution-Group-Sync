@@ -48,6 +48,10 @@ if (!$bind2) {
  */
 $dn_list1 = find_dn_list($ldap1,$binddn1);
 $dn_list2 = find_dn_list($ldap2,$binddn2);
+$numberOfGroupCreated = 0;
+$numberOfGroupDeleted = 0;
+$numberOfMembersAdded = 0;
+$numberOfMembersRemoved = 0;
 
 /**
  * Distribution gruplari ve memberlarini ceker, bir array halinde doner.
@@ -199,6 +203,8 @@ function create_group($groupName){
     ldap_add($ldap2, $dn,$group_info);
     update_dn_list($groupName,$dn);
     fwrite($logfile, $groupName." isimli grup eklendi.\n");
+    $GLOBALS["numberOfGroupCreated"]++;
+
     //TODO :  Update DN
 }
 
@@ -211,8 +217,9 @@ function delete_group($groupName){
     $dn_list2 = $GLOBALS["dn_list2"];
     $ldap2 = $GLOBALS["ldap2"];
     $dn = $dn_list2[$groupName];
-    ldap_delete($ldap2, $dn);
-    fwrite($logfile, $groupName." isimli grup silindi.\n");
+    //ldap_delete($ldap2, $dn);
+    fwrite($logfile, $groupName." isimli grup silinmeli.\n");
+    $GLOBALS["numberOfGroupDeleted"]++;
 
 }
 
@@ -245,6 +252,7 @@ function add_members($groupName,$data1,$data2){
                 ldap_mod_add($ldap2,$dn,$group_info);
                 update_dn_list($memberName,$dn);
                 fwrite($logfile, $groupName." grubundan ".$memberName." kullanicisi silindi.\n");
+                $GLOBALS["numberOfMembersAdded"]++;
 
             }
             else{
@@ -277,7 +285,7 @@ function remove_members($groupName,$data1,$data2){
             $group_info['member'] = $dn_list2[$memberName];
             ldap_mod_del($ldap2, $dn, $group_info);  
             fwrite($logfile, $groupName." grubundan ".$memberName." kullanicisi silindi.\n");
-
+            $GLOBALS["numberOfMembersRemoved"]++;
         }
     }
 
@@ -321,11 +329,20 @@ function run(){
 
     
 }
-/*
-print_r($dn_list1);
+
+/*print_r($dn_list1);
 print_r("\n");
 print_r($dn_list2);
-print_r("\n");*/
+print_r("\n");
+*/
 run();
+
+fwrite($logfile, "\nDetaylar\n");
+fwrite($logfile, $numberOfGroupCreated." grup olusturuldu.\n");
+fwrite($logfile, $numberOfGroupDeleted." grubun silinmesi gerekiyor.\n");
+fwrite($logfile, $numberOfMembersAdded." user gruplara eklendi.\n");
+fwrite($logfile, $numberOfMembersRemoved." user gruplardan cikarildi.\n");
+
 ldap_close($ldap1);
 ldap_close($ldap2);
+//TODO silme islemi yapmayalim
