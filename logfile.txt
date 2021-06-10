@@ -1,0 +1,11 @@
+Distribution Group grubundan Administrator kullanicisi silindi.
+MailGrp1 isimli grup eklendi.
+MailGrp1 grubundan user2 kullanicisi silindi.
+MailGrp1 grubundan user3 kullanicisi silindi.
+MailGrp2 isimli grup eklendi.
+MailGrp2 grubundan user2 kullanicisi silindi.
+MailGrp2 grubundan user4 kullanicisi silindi.
+Distribution Group grubundan user4 kullanicisi silindi.
+Distribution Group grubundan user5 kullanicisi silindi.
+Distribution Group grubundan user3 kullanicisi silindi.
+copy of Gruplar isimli grup silindi.
