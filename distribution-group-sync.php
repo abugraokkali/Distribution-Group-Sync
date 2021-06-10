@@ -31,6 +31,7 @@ if (!$bind2) {
     exit('Binding failed');
 }
 
+
 function find_groups($ldap,$binddn,$domainname){
     //Distribution gruplari ve memberlarini ceker, bir array halinde doner.
     $filter = "(&(objectCategory=group)(!(groupType:1.2.840.113556.1.4.803:=2147483648)))";
@@ -39,6 +40,7 @@ function find_groups($ldap,$binddn,$domainname){
 
     $data['count'] = $entries['count'];
     $data['domainName'] = $domainname;
+    //print_r(array_column($entries,"member"));
 
     $numberOfGroups = $entries['count'];
     for($i=0 ; $i<$numberOfGroups ; $i++){
@@ -56,6 +58,8 @@ function find_groups($ldap,$binddn,$domainname){
         for($j=0 ; $j<$numberOfMembers ; $j++ ){
 
             $member = $entries[$i]['member'][$j];
+            //$member = $users[$userdn]['member'][$j];
+            //array_push($data[$name], $member);
             $pos = strpos($member, ',');
             $member = substr($member,0,$pos);
             array_push($data[$name], $member);
@@ -63,6 +67,34 @@ function find_groups($ldap,$binddn,$domainname){
 
     }
     return $data;
+}
+$list1 = find_users_and_groups_dn($ldap1,$binddn1);
+$list2 = find_users_and_groups_dn($ldap2,$binddn2);
+
+function find_users_and_groups_dn($ldap,$binddn){
+    //Tum user  ve ceker, bir array halinde doner.
+    $filter = "objectCategory=user";
+    $result = ldap_search($ldap, $binddn, $filter);
+    $entries = ldap_get_entries($ldap,$result);
+    $numberOfUsers = $entries['count'];
+    for($i=0 ; $i<$numberOfUsers ; $i++){
+    
+        $samaccountname = $entries[$i]['samaccountname'][0];
+        $data[$samaccountname] = $entries[$i]['distinguishedname'][0];    
+
+    }
+    $filter = "(&(objectCategory=group)(!(groupType:1.2.840.113556.1.4.803:=2147483648)))";
+    $result = ldap_search($ldap, $binddn, $filter);
+    $entries = ldap_get_entries($ldap,$result);
+    $numberOfGroups = $entries['count'];
+    for($i=0 ; $i<$numberOfGroups ; $i++){
+    
+        $name = $entries[$i]['name'][0];
+        $data[$name] = $entries[$i]['distinguishedname'][0];    
+
+    }
+    return $data;
+   
 }
 function sync($data1,$data2){
 
@@ -115,10 +147,10 @@ function create_group($groupName){
 
 }
 function delete_group($groupName){
-
+    $list2 = $GLOBALS["list2"];
     $ldap2 = $GLOBALS["ldap2"];
-    $group = 'CN='.$groupName.',CN=Users,DC=bugra,DC=lab';
-    ldap_delete($ldap2, $group);
+    $dn = $list2[$groupName];
+    ldap_delete($ldap2, $dn);
 
 }
 function add_members($groupName,$data1,$data2){
@@ -132,7 +164,7 @@ function add_members($groupName,$data1,$data2){
     for($j=0 ; $j<$numberOfMembers; $j++){
 
         $memberName = $data1[$groupName][$j];
-
+        
         if (!in_array($memberName, $data2[$groupName])){
             $dn = 'CN='.$groupName.',CN=Users,DC=bugra,DC=lab';
             $group_info['member'] = $memberName.',CN=Users,DC=bugra,DC=lab';
@@ -159,10 +191,14 @@ function remove_members($groupName,$data1,$data2){
     }
 }
 
+print_r($list1);
+print_r("\n");
+print_r($list2);
 
 $data1 = find_groups($ldap1,$binddn1,$domainname1);
 $data2 = find_groups($ldap2,$binddn2,$domainname2);
 print_r("\n ### Before the synchronization ###");
+print_r("\n");
 print_r($data1);
 print_r("\n");
 print_r($data2);
