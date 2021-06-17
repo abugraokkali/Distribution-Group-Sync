@@ -102,7 +102,6 @@ print_r($samba_users);
 function sync($samba_conversion){
 
     $ad_conversion = $GLOBALS['ad_conversion'];
-    //$samba_conversion = $GLOBALS['samba_conversion'];
     $samba = $GLOBALS['samba'];
     $f_detailed_log =  $GLOBALS['f_detailed_log'];
 
@@ -126,15 +125,10 @@ function sync($samba_conversion){
 
             fwrite($f_detailed_log , $groupName." grubu başarıyla oluşturuldu.");
             $GLOBALS["created_groups"]++;
-              
-            $samba_conversion = fill_members($groupName,$samba_conversion);
-
         }
-        else{
-        //If there is a common group; Add the missing members to the group in the 2nd domain.
-            $samba_conversion = fill_members($groupName,$samba_conversion);
+        
+        $samba_conversion = fill_members($groupName,$samba_conversion);
 
-        }
         
     }
     foreach ($samba_conversion[2] as $key => $value){
@@ -148,7 +142,7 @@ function sync($samba_conversion){
         }
         //If there is a common group; Remove the extra members from the group in the 2nd domain.
         else{
-            remove_members($groupName);
+            $samba_conversion = remove_members($groupName,$samba_conversion);
         }
     }
 
@@ -158,8 +152,6 @@ function sync($samba_conversion){
 function fill_members($groupName,$samba_conversion){
 
     $ad_conversion = $GLOBALS['ad_conversion'];
-    //$samba_conversion = $GLOBALS['samba_conversion'];
-    //print_r($samba_conversion);
     $samba_users = $GLOBALS['samba_users'];
     $samba = $GLOBALS['samba'];
     $f_detailed_log =  $GLOBALS['f_detailed_log'];
@@ -176,7 +168,7 @@ function fill_members($groupName,$samba_conversion){
                     "member" => $samba_users[$member]
                 ]);
                 fwrite($f_detailed_log , $groupName." grubuna ".$member." kullanıcısı  başarıyla eklendi.\n");
-                 $GLOBALS["added_members"]++;
+                $GLOBALS["added_members"]++;
                 
             }
             else{
@@ -192,10 +184,9 @@ function fill_members($groupName,$samba_conversion){
     return $samba_conversion;
 }
 
-function remove_members($groupName){
+function remove_members($groupName,$samba_conversion){
 
     $ad_conversion = $GLOBALS['ad_conversion'];
-    $samba_conversion = $GLOBALS['samba_conversion'];
     $samba_users = $GLOBALS['samba_users'];
     $samba = $GLOBALS['samba'];
     $f_detailed_log =  $GLOBALS['f_detailed_log'];
@@ -214,18 +205,40 @@ function remove_members($groupName){
 
         }
     }
+    return $samba_conversion;
+}
+
+function write_summary(){
+
+    $f_summary = $GLOBALS["f_summary"];
+    fwrite($f_summary ,"Detaylar\n");
+    fwrite($f_summary ,"Oluşturulan grup sayısı : ".$GLOBALS["created_groups"]."\n");
+    fwrite($f_summary ,"Silinmesi gereken grup sayısı : ".$GLOBALS["deleted_groups"]."\n");
+    fwrite($f_summary ,"Gruplara eklenen üye sayısı : ".$GLOBALS["added_members"]."\n");
+    fwrite($f_summary ,"Gruplardan çıkarılan üye sayısı : ".$GLOBALS["removed_members"]."\n");
+    fwrite($f_summary ,"Fazladan üye sayısı : ".$GLOBALS["created_users"]."\n");
+
+}
+
+function write_sid_diff($ad_conversion,$samba_conversion){
+    $f_sid_diff = $GLOBALS["f_sid_diff"];
+    $result = array_diff_assoc($ad_conversion[1],$samba_conversion[1]);
+    foreach ($result as $key => $value){
+        fwrite($f_sid_diff , $key." => ".$value."\n");
+
+    }
 
 }
 
 print_r("\n");
 $samba_conversion = sync($samba_conversion);
+write_summary();
 print_r("\n");
-fwrite($f_summary ,"Detaylar\n");
-fwrite($f_summary ,"Oluşturulan grup sayısı : ".$created_groups."\n");
-fwrite($f_summary ,"Silinmesi gereken grup sayısı : ".$deleted_groups."\n");
-fwrite($f_summary ,"Gruplara eklenen üye sayısı : ".$added_members."\n");
-fwrite($f_summary ,"Gruplardan çıkarılan üye sayısı : ".$removed_members."\n");
-fwrite($f_summary ,"Oluşturulması gereken üye sayısı : ".$created_users."\n");
+print_r("\n");
+print_r("\n");
+write_sid_diff($ad_conversion,$samba_conversion);
+
+
 
 
 function convertGroup($ldap_search_resutl,$users) {
