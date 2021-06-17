@@ -18,6 +18,14 @@ define("AD_SERVER_LDAP_PORT", 636);
 define("AD_DOMAIN_DN", "DC=ali,DC=lab");
 define("AD_SEARCH_DN", "DC=ali,DC=lab");
 
+//Counters
+$created_groups = 0;
+$deleted_groups = 0;
+$added_members = 0;
+$removed_members = 0;
+$created_users = 0;
+
+// files
 if(!is_dir("./logs/")){
     mkdir("./logs/");
 }
@@ -26,7 +34,6 @@ if(!is_dir(LOG_FILE)){
     mkdir(LOG_FILE);
 }
 
-// files
 $f_detailed_log = fopen(LOG_FILE."/detailed_log.csv","w");
 $f_summary = fopen(LOG_FILE."/summary.csv","w");
 $f_sid_diff = fopen(LOG_FILE."/sid_diff.txt","w");
@@ -105,8 +112,6 @@ function sync($samba_conversion){
         if (!array_key_exists($groupName, $samba_conversion[2])){
         //If there is a missing group in the 2nd domain; Create the group and fill its members.
 
-            //print_r($groupName." grubu create edilecek ve uyeleri doldurulacak\n");
-
             $dn = 'CN='.$groupName.','.SAMBA_DEFAULT_GROUP_DN;
             $samba->addObject($dn,[
                 "objectClass" => "top",
@@ -115,24 +120,13 @@ function sync($samba_conversion){
                 "instanceType" => 4,
                 "sAMAccountName" => $groupName
             ]);
-            //print_r($groupName."\n");
-            //print_r($dn."\n");
-            //print_r($samba_conversion[0]);
-
-            //array_push($samba_conversion[0], array($groupName => $dn));
-            //$samba_conversion[0] += [$groupName => $dn];
             $samba_conversion[0][$groupName] = $dn;
             $samba_conversion[1][$groupName] = null;
-
-            //$array1 = array($groupName => $dn);
-            //$result = array_merge($array1, $samba_conversion[0]);
-            //TODO objectSid eklenecek.
-
             $samba_conversion[2][$groupName] = array();
+
             fwrite($f_detailed_log , $groupName." grubu başarıyla oluşturuldu.");
-            
-            print_r($samba_conversion);
-            
+            $GLOBALS["created_groups"]++;
+              
             $samba_conversion = fill_members($groupName,$samba_conversion);
 
         }
@@ -148,8 +142,9 @@ function sync($samba_conversion){
         $groupName = $key;
         //If there is an extra group in the 2nd domain; Delete the group
         if (!array_key_exists($groupName, $ad_conversion[2])){
-            
-            //NOTE you can delete the group
+
+            $GLOBALS["deleted_groups"]++;
+            //NOTE: This group can be deleted.
         }
         //If there is a common group; Remove the extra members from the group in the 2nd domain.
         else{
@@ -181,13 +176,15 @@ function fill_members($groupName,$samba_conversion){
                     "member" => $samba_users[$member]
                 ]);
                 fwrite($f_detailed_log , $groupName." grubuna ".$member." kullanıcısı  başarıyla eklendi.\n");
+                 $GLOBALS["added_members"]++;
                 
             }
             else{
             //If the 2nd domain does not has the user
                 fwrite($f_detailed_log ,$groupName." grubuna ".$member." kullanıcısı  eklenemedi !!!");
                 fwrite($f_detailed_log ,"\tÇünkü ".$member." 2. domainde tanımlı bir kullanıcı değil.\n");
-                //NOTE User create edilebilir.
+                $GLOBALS["created_users"]++;
+                //NOTE: A user can be created.
             }
         }
         
@@ -213,6 +210,7 @@ function remove_members($groupName){
                 "member" => $samba_users[$member]
             ]);
             fwrite($f_detailed_log , $groupName." grubundan ".$member." kullanıcısı  başarıyla çıkarıldı.\n");
+            $GLOBALS["removed_members"]++;
 
         }
     }
@@ -222,6 +220,12 @@ function remove_members($groupName){
 print_r("\n");
 $samba_conversion = sync($samba_conversion);
 print_r("\n");
+fwrite($f_summary ,"Detaylar\n");
+fwrite($f_summary ,"Oluşturulan grup sayısı : ".$created_groups."\n");
+fwrite($f_summary ,"Silinmesi gereken grup sayısı : ".$deleted_groups."\n");
+fwrite($f_summary ,"Gruplara eklenen üye sayısı : ".$added_members."\n");
+fwrite($f_summary ,"Gruplardan çıkarılan üye sayısı : ".$removed_members."\n");
+fwrite($f_summary ,"Oluşturulması gereken üye sayısı : ".$created_users."\n");
 
 
 function convertGroup($ldap_search_resutl,$users) {
