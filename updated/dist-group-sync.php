@@ -36,7 +36,7 @@ if(!is_dir(LOG_FILE)){
 
 $f_detailed_log = fopen(LOG_FILE."/detailed_log.csv","w");
 $f_summary = fopen(LOG_FILE."/summary.csv","w");
-$f_sid_diff = fopen(LOG_FILE."/sid_diff.txt","w");
+$f_sid_diff = fopen(LOG_FILE."/sid_diff.csv","w");
 
 // Samba connection
 $samba = new LdapConnection(SAMBA_SERVER_IP, SAMBA_USERNAME, SAMBA_PASSWORD, true, SAMBA_DOMAIN_DN, SAMBA_SERVER_LDAP_PORT);
