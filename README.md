@@ -2,5 +2,5 @@
 
 A script that synchronizes distribution groups.
 
-Ali Buğra Okkalı  
-HAVELSAN - 2021
+*Ali Buğra Okkalı  
+HAVELSAN - 2021*
